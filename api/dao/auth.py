@@ -30,18 +30,35 @@ class AuthDAO:
     def register(self, email, plain_password, name):
         encrypted = bcrypt.hashpw(plain_password.encode("utf8"), bcrypt.gensalt()).decode('utf8')
 
+        def create_user(tx, email, encrypted, name):
+            return tx.run("""
+                CREATE (u:User {
+                    userId: randomUuid(),
+                    email: $email,
+                    password: $encrypted,
+                    name: $name
+                    })
+                    RETURN u
+                """,
+                email=email, encrypted=encrypted, name=name
+            ).single()
+        
+        with self.driver.session() as session:
+            result = session.execute_write(create_user, email, encrypted, name)
+            user = result['u']
+
         # TODO: Handle unique constraint error
-        if email != "graphacademy@neo4j.com":
-            raise ValidationException(
-                f"An account already exists with the email address {email}",
-                {"email": "An account already exists with this email"}
-            )
+        # if email != "graphacademy@neo4j.com":
+        #     raise ValidationException(
+        #         f"An account already exists with the email address {email}",
+        #         {"email": "An account already exists with this email"}
+        #     )
 
         # Build a set of claims
         payload = {
-            "userId": "00000000-0000-0000-0000-000000000000",
-            "email": email,
-            "name": name,
+            "userId": user['userId'],
+            "email": user['email'],
+            "name": user['name'],
         }
 
         # Generate Token

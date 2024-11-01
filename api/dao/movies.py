@@ -1,7 +1,6 @@
 from api.data import popular, goodfellas
 
 from api.exceptions.notfound import NotFoundException
-from api.data import popular
 
 class MovieDAO:
     """
@@ -22,7 +21,28 @@ class MovieDAO:
     # tag::all[]
     def all(self, sort, order, limit=6, skip=0, user_id=None):
         # TODO: Get list from movies from Neo4j
-        return popular
+
+        """
+        This function represents a unit of work.
+        """
+        def get_movies(tx, sort="title", order="ASC", limit=6, skip=0, user_id=None):
+            cypher = """
+                MATCH (m:Movie)
+                WHERE m.`{0}` IS NOT NULL
+                RETURN m {{ .* }} AS movie
+                ORDER BY m.`{0}` {1}
+                SKIP $skip
+                LIMIT $limit
+            """.format(sort, order)
+
+        
+            result = tx.run(cypher, limit=limit, skip=skip, user_id=user_id)
+
+            return [row.value("movie") for row in result]
+
+
+        with self.driver.session() as session:
+            return session.execute_read(get_movies, sort, order, limit, skip, user_id)
     # end::all[]
 
     """
@@ -134,3 +154,4 @@ class MovieDAO:
     def get_user_favorites(self, tx, user_id):
         return []
     # end::getUserFavorites[]
+
